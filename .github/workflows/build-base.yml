@@ -35,7 +35,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:multilingual-e5-base
+            ghcr.io/${{ github.repository }}:3.12-slim-multilingual-e5-base
             ghcr.io/${{ github.repository }}:latest
           secrets: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}

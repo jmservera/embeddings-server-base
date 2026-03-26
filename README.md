@@ -10,25 +10,25 @@ The aithena embeddings-server needs to download a ~1GB model on every Docker bui
 
 | Tag | Model | Size |
 |-----|-------|------|
-| `multilingual-e5-base` | intfloat/multilingual-e5-base | ~1.1GB |
+| `3.12-slim-multilingual-e5-base` | intfloat/multilingual-e5-base | ~1.1GB |
 
 ## Usage
 
 In your Dockerfile:
 ```dockerfile
-FROM ghcr.io/jmservera/embeddings-server-base:multilingual-e5-base AS model-cache
+FROM ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base AS model-cache
 # Model is pre-cached in /models/sentence_transformers/ and /models/huggingface/
 ```
 
 ## Building
 
 ```bash
-docker build -t ghcr.io/jmservera/embeddings-server-base:multilingual-e5-base .
+docker build -t ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base .
 ```
 
 With HF token for faster downloads:
 ```bash
-docker build --secret id=HF_TOKEN,env=HF_TOKEN -t ghcr.io/jmservera/embeddings-server-base:multilingual-e5-base .
+docker build --secret id=HF_TOKEN,env=HF_TOKEN -t ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base .
 ```
 
 ## Related
