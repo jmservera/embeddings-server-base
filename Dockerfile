@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
 ARG MODEL_NAME=intfloat/multilingual-e5-base
+ARG INSTALL_OPENVINO=false
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -17,3 +18,8 @@ RUN pip install --no-cache-dir sentence-transformers huggingface_hub
 RUN --mount=type=secret,id=HF_TOKEN \
     export HF_TOKEN="$(cat /run/secrets/HF_TOKEN 2>/dev/null || true)" && \
     python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}')"
+
+# Optionally install OpenVINO for Intel GPU acceleration
+RUN if [ "$INSTALL_OPENVINO" = "true" ]; then \
+    pip install --no-cache-dir optimum-intel openvino; \
+    fi
