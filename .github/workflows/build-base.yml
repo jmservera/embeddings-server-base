@@ -19,6 +19,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - variant: torch
+            tag_suffix: ""
+            backend: "torch"
+          - variant: openvino
+            tag_suffix: "-openvino"
+            backend: "openvino"
     steps:
       - uses: actions/checkout@v4
 
@@ -29,13 +38,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push ${{ matrix.variant }} variant
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          build-args: |
+            BACKEND=${{ matrix.backend }}
           tags: |
-            ghcr.io/${{ github.repository }}:3.12-slim-multilingual-e5-base
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:3.12-slim-multilingual-e5-base${{ matrix.tag_suffix }}
+            ${{ matrix.variant == 'torch' && format('ghcr.io/{0}:latest', github.repository) || '' }}
           secrets: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
