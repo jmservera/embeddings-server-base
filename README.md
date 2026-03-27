@@ -6,35 +6,39 @@ Pre-built Docker base image with cached embedding models for the [aithena](https
 
 The aithena embeddings-server needs to download a ~1GB model on every Docker build. This base image caches the model so that code-only rebuilds skip the download entirely.
 
-> **Note:** This image only caches the model. GPU-specific dependencies (e.g. OpenVINO
-> for Intel) are installed conditionally in the consuming Dockerfile's dependencies stage.
-> See the [aithena embeddings-server Dockerfile](https://github.com/jmservera/aithena/blob/main/src/embeddings-server/Dockerfile).
+Two variants are built — one with the default PyTorch/safetensors model files, and one with OpenVINO IR model files for Intel GPU acceleration. Each variant caches the correct model format so the consuming Dockerfile can run fully offline.
 
 ## Available Tags
 
-| Tag | Model |
-|-----|-------|
-| `3.12-slim-multilingual-e5-base` | intfloat/multilingual-e5-base |
-| `latest` | Alias for the above |
+| Tag | Backend | Model format |
+|-----|---------|-------------|
+| `3.12-slim-multilingual-e5-base` | torch (default) | PyTorch safetensors |
+| `3.12-slim-multilingual-e5-base-openvino` | openvino | OpenVINO IR (xml + bin) |
+| `latest` | torch | Alias for the default tag |
 
 ## Usage
 
 In your Dockerfile:
 ```dockerfile
-FROM ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base AS model-cache
+# Standard (CPU / NVIDIA)
+FROM ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base
 
-# Model is pre-cached in /models/sentence_transformers/ and /models/huggingface/
+# OpenVINO (Intel GPU)
+FROM ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base-openvino
 ```
+
+Model files are pre-cached in `/models/sentence_transformers/` and `/models/huggingface/`.
 
 ## Building
 
 ```bash
-docker build -t ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base .
-```
+# Standard (torch) variant
+docker build --secret id=HF_TOKEN,env=HF_TOKEN \
+  -t ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base .
 
-With HF token for faster downloads:
-```bash
-docker build --secret id=HF_TOKEN,env=HF_TOKEN -t ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base .
+# OpenVINO variant
+docker build --build-arg BACKEND=openvino --secret id=HF_TOKEN,env=HF_TOKEN \
+  -t ghcr.io/jmservera/embeddings-server-base:3.12-slim-multilingual-e5-base-openvino .
 ```
 
 ## Related
