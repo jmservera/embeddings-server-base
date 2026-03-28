@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'Dockerfile'
+      - 'Dockerfile.openvino'
   workflow_dispatch:
     inputs:
       model:
@@ -25,9 +26,11 @@ jobs:
           - variant: torch
             tag_suffix: ""
             backend: "torch"
+            dockerfile: "Dockerfile"
           - variant: openvino
             tag_suffix: "-openvino"
             backend: "openvino"
+            dockerfile: "Dockerfile.openvino"
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +45,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: true
           build-args: |
             BACKEND=${{ matrix.backend }}
