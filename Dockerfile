@@ -17,25 +17,23 @@ RUN pip install --no-cache-dir sentence-transformers huggingface_hub && \
       pip install --no-cache-dir optimum-intel openvino; \
     fi
 
-# Pre-download the model so it is baked into the image.
-# 1. snapshot_download() caches the full HF Hub repo (metadata + tree listings)
-#    so that offline loading doesn't need to reach huggingface.co.
-# 2. SentenceTransformer() warms the sentence-transformers cache for the backend.
+# Download model and save to a known local path for offline loading.
+# Loading from a local directory bypasses all HF Hub API calls, which is the
+# only reliable way to support offline mode with the openvino backend.
 # HF_TOKEN is mounted as a build secret — never stored in image layers.
 RUN --mount=type=secret,id=HF_TOKEN \
     export HF_TOKEN="$(cat /run/secrets/HF_TOKEN 2>/dev/null || true)" && \
-    python -c "from huggingface_hub import snapshot_download; snapshot_download('${MODEL_NAME}')" && \
     if [ "$BACKEND" = "openvino" ]; then \
-      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}', backend='openvino')"; \
+      python -c "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('${MODEL_NAME}', backend='openvino'); m.save('/models/sentence_transformers/$(echo ${MODEL_NAME} | tr / _)')"; \
     else \
-      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}')"; \
+      python -c "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('${MODEL_NAME}'); m.save('/models/sentence_transformers/$(echo ${MODEL_NAME} | tr / _)')"; \
     fi
 
-# Verify the cache works fully offline — fail the build if it doesn't.
+# Verify offline loading from local path — fails the build if cache is incomplete.
 RUN if [ "$BACKEND" = "openvino" ]; then \
       HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -c \
-        "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}', backend='openvino')"; \
+        "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('/models/sentence_transformers/$(echo ${MODEL_NAME} | tr / _)', backend='openvino'); print(f'OK dim={m.get_sentence_embedding_dimension()}')"; \
     else \
       HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -c \
-        "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}')"; \
+        "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('/models/sentence_transformers/$(echo ${MODEL_NAME} | tr / _)'); print(f'OK dim={m.get_sentence_embedding_dimension()}')"; \
     fi
