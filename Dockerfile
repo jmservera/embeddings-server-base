@@ -18,14 +18,24 @@ RUN pip install --no-cache-dir sentence-transformers huggingface_hub && \
     fi
 
 # Pre-download the model so it is baked into the image.
-# The BACKEND arg controls the model format:
-#   torch    → downloads PyTorch/safetensors files (default)
-#   openvino → downloads OpenVINO IR files (openvino_model.xml + .bin)
+# 1. snapshot_download() caches the full HF Hub repo (metadata + tree listings)
+#    so that offline loading doesn't need to reach huggingface.co.
+# 2. SentenceTransformer() warms the sentence-transformers cache for the backend.
 # HF_TOKEN is mounted as a build secret — never stored in image layers.
 RUN --mount=type=secret,id=HF_TOKEN \
     export HF_TOKEN="$(cat /run/secrets/HF_TOKEN 2>/dev/null || true)" && \
+    python -c "from huggingface_hub import snapshot_download; snapshot_download('${MODEL_NAME}')" && \
     if [ "$BACKEND" = "openvino" ]; then \
       python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}', backend='openvino')"; \
     else \
       python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}')"; \
+    fi
+
+# Verify the cache works fully offline — fail the build if it doesn't.
+RUN if [ "$BACKEND" = "openvino" ]; then \
+      HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -c \
+        "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}', backend='openvino')"; \
+    else \
+      HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -c \
+        "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}')"; \
     fi
