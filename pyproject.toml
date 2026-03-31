@@ -10,6 +10,5 @@ dependencies = [
 
 [project.optional-dependencies]
 openvino = [
-    "optimum-intel",
-    "openvino",
+    "sentence-transformers[openvino]",
 ]

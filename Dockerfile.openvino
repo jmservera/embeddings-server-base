@@ -10,9 +10,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 USER root
 
-# Create app user (uid 1000) — consistent with the app image
-RUN groupadd --system --gid 1000 app 2>/dev/null || true && \
-    useradd --system --uid 1000 --gid app --create-home app 2>/dev/null || true
+# Ensure app user (uid 1000) exists — consistent with the app image.
+# The OV base image has ubuntu:1000, so rename it to app.
+RUN if id -u app >/dev/null 2>&1; then true; \
+    elif id -u 1000 >/dev/null 2>&1; then \
+      existing=$(getent passwd 1000 | cut -d: -f1) && \
+      groupmod -n app "$(getent group 1000 | cut -d: -f1)" && \
+      usermod -l app -d /home/app -m "$existing"; \
+    else \
+      groupadd --system --gid 1000 app && \
+      useradd --system --uid 1000 --gid app --create-home app; \
+    fi
 
 RUN mkdir -p /models /app
 

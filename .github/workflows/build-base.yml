@@ -6,6 +6,8 @@ on:
     paths:
       - 'Dockerfile'
       - 'Dockerfile.openvino'
+      - 'pyproject.toml'
+      - 'scripts/**'
   workflow_dispatch:
     inputs:
       model:

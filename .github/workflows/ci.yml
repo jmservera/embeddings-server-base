@@ -1,0 +1,42 @@
+# CI: Build-verify gate for PRs — prevents merge if container build fails
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "Dockerfile.openvino"
+      - "pyproject.toml"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: torch
+            backend: "torch"
+            dockerfile: "Dockerfile"
+          - variant: openvino
+            backend: "openvino"
+            dockerfile: "Dockerfile.openvino"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.variant }} variant
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          build-args: |
+            BACKEND=${{ matrix.backend }}
+          tags: test-${{ matrix.variant }}:ci
+          secrets: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
