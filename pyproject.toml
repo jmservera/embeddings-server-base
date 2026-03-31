@@ -1,0 +1,15 @@
+[project]
+name = "embeddings-base"
+version = "0.1.0"
+description = "Base image dependencies for embeddings server"
+requires-python = ">=3.12"
+dependencies = [
+    "sentence-transformers",
+    "huggingface_hub",
+]
+
+[project.optional-dependencies]
+openvino = [
+    "optimum-intel",
+    "openvino",
+]

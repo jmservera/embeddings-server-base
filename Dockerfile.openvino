@@ -18,12 +18,16 @@ RUN mkdir -p /models /app
 
 WORKDIR /app
 
+# Copy pyproject.toml and model verification script
+COPY pyproject.toml /app/
+COPY scripts/verify_model.py /app/scripts/
+
 # Create .venv and install heavy deps using uv (mounted transiently, not in image).
-# The openvino package from the base image PYTHONPATH remains available, but
-# optimum-intel and sentence-transformers are installed in .venv for portability.
+# Install openvino in the venv for self-contained environment (fixes PYTHONPATH issue).
+# optimum-intel and sentence-transformers are installed for portability.
 RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv \
     uv venv /app/.venv && \
-    VIRTUAL_ENV=/app/.venv uv pip install --no-cache sentence-transformers huggingface_hub optimum-intel
+    VIRTUAL_ENV=/app/.venv uv sync --no-dev --extra openvino
 
 ENV PATH="/app/.venv/bin:${PATH}"
 
@@ -31,13 +35,10 @@ ENV PATH="/app/.venv/bin:${PATH}"
 # HF_TOKEN is mounted as a build secret — never stored in image layers.
 RUN --mount=type=secret,id=HF_TOKEN \
     export HF_TOKEN="$(cat /run/secrets/HF_TOKEN 2>/dev/null || true)" && \
-    python3 -c "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('${MODEL_NAME}', backend='openvino'); m.save('/models/sentence_transformers/$(echo ${MODEL_NAME} | tr / _)')"
+    python3 scripts/verify_model.py --model-name "${MODEL_NAME}" --backend openvino --save-dir /models/sentence_transformers
 
 # Verify offline loading from local path — fails the build if cache is incomplete.
-RUN HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 -c "\
-from sentence_transformers import SentenceTransformer; \
-m = SentenceTransformer('/models/sentence_transformers/$(echo ${MODEL_NAME} | tr / _)', backend='openvino'); \
-print(f'OK dim={m.get_sentence_embedding_dimension()}')"
+RUN python3 scripts/verify_model.py --model-name "${MODEL_NAME}" --backend openvino --save-dir /models/sentence_transformers --verify-offline
 
 # Own /app to app user; /models stays root-owned, world-readable
 RUN chown -R app:app /app && chmod -R a+rX /models
