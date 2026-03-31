@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM openvino/ubuntu24_runtime:2025.4.0
 
 ARG MODEL_NAME=intfloat/multilingual-e5-base
@@ -9,12 +10,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 USER root
 
-RUN mkdir -p /models
+# Create app user (uid 1000) — consistent with the app image
+RUN groupadd --system --gid 1000 app 2>/dev/null || true && \
+    useradd --system --uid 1000 --gid app --create-home app 2>/dev/null || true
 
-# Install only what's needed to download the model in OpenVINO IR format.
-# The openvino Python package is already provided by the base image via PYTHONPATH;
-# optimum-intel bridges HuggingFace models ↔ OpenVINO IR conversion.
-RUN pip install --no-cache-dir sentence-transformers huggingface_hub optimum-intel
+RUN mkdir -p /models /app
+
+WORKDIR /app
+
+# Create .venv and install heavy deps using uv (mounted transiently, not in image).
+# The openvino package from the base image PYTHONPATH remains available, but
+# optimum-intel and sentence-transformers are installed in .venv for portability.
+RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv \
+    uv venv /app/.venv && \
+    VIRTUAL_ENV=/app/.venv uv pip install --no-cache sentence-transformers huggingface_hub optimum-intel
+
+ENV PATH="/app/.venv/bin:${PATH}"
 
 # Download model, export to OpenVINO IR, and save to a known local path.
 # HF_TOKEN is mounted as a build secret — never stored in image layers.
@@ -28,4 +39,7 @@ from sentence_transformers import SentenceTransformer; \
 m = SentenceTransformer('/models/sentence_transformers/$(echo ${MODEL_NAME} | tr / _)', backend='openvino'); \
 print(f'OK dim={m.get_sentence_embedding_dimension()}')"
 
-USER openvino
+# Own /app to app user; /models stays root-owned, world-readable
+RUN chown -R app:app /app && chmod -R a+rX /models
+
+USER app
